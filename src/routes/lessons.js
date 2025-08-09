@@ -107,11 +107,37 @@ router.get('/', optionalAuth, LessonController.getAllLessons);
  *                     problem_type: "multiple_choice"
  *                     options: ["6", "7", "8", "9"]
  *                     order_index: 1
+ *                     problem_options:
+ *                       - problem_option_id: 1
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440101"
+ *                         option: "6"
+ *                       - problem_option_id: 2
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440101"
+ *                         option: "7"
+ *                       - problem_option_id: 3
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440101"
+ *                         option: "8"
+ *                       - problem_option_id: 4
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440101"
+ *                         option: "9"
  *                   - id: "550e8400-e29b-41d4-a716-446655440102"
  *                     question: "What is 12 + 7?"
  *                     problem_type: "multiple_choice"
  *                     options: ["18", "19", "20", "21"]
  *                     order_index: 2
+ *                     problem_options:
+ *                       - problem_option_id: 5
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440102"
+ *                         option: "18"
+ *                       - problem_option_id: 6
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440102"
+ *                         option: "19"
+ *                       - problem_option_id: 7
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440102"
+ *                         option: "20"
+ *                       - problem_option_id: 8
+ *                         problem_id: "550e8400-e29b-41d4-a716-446655440102"
+ *                         option: "21"
  *       400:
  *         description: Invalid lesson ID
  *         content:

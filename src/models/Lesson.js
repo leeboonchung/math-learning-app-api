@@ -23,20 +23,46 @@ class Lesson {
     return result.rows;
   }
 
-  static async findById(id, includeProblems = false) {
-    const lesson = await db.query('SELECT * FROM lesson WHERE id = $1 AND is_active = true', [id]);
-    
+  static async findById(id, includeProblems = true) {
+    let query = `
+        SELECT
+        l.lesson_id
+        , l.lesson_name
+        FROM public.lesson l
+        WHERE l.lesson_id = $1
+    `
+    const lesson = await db.query(query, [id]);
+
     if (lesson.rows.length === 0) return null;
     
     const lessonData = lesson.rows[0];
     
     if (includeProblems) {
       const problems = await db.query(`
-        SELECT id, question, problem_type, options, order_index
-        FROM problems 
-        WHERE lesson_id = $1 
-        ORDER BY order_index
+        SELECT 
+            p.problem_id
+            , p.question
+            , p.reward_xp
+            , p.order
+        FROM problem p
+        WHERE p.lesson_id = $1 
+        ORDER BY p.order
       `, [id]);
+      
+      // Get problem options for each problem
+      for (let problem of problems.rows) {
+        const options = await db.query(`
+          SELECT 
+            po.problem_option_id,
+            po.problem_id,
+            po.option
+          FROM problem_option po
+          WHERE po.problem_id = $1
+          ORDER BY po.problem_option_id
+        `, [problem.problem_id]);
+        
+        problem.options = options.rows;
+      }
       
       lessonData.problems = problems.rows;
     }
@@ -70,6 +96,21 @@ class Lesson {
       ORDER BY order_index
     `, [id]);
     
+    // Get problem options for each problem
+    for (let problem of problems.rows) {
+      const options = await db.query(`
+        SELECT 
+          po.problem_option_id,
+          po.problem_id,
+          po.option
+        FROM problem_options po
+        WHERE po.problem_id = $1
+        ORDER BY po.problem_option_id
+      `, [problem.id]);
+      
+      problem.problem_options = options.rows;
+    }
+    
     lessonData.problems = problems.rows;
     return lessonData;
   }
@@ -81,6 +122,21 @@ class Lesson {
       WHERE lesson_id = $1 
       ORDER BY order_index
     `, [lessonId]);
+    
+    // Get problem options for each problem
+    for (let problem of result.rows) {
+      const options = await db.query(`
+        SELECT 
+          po.problem_option_id,
+          po.problem_id,
+          po.option
+        FROM problem_options po
+        WHERE po.problem_id = $1
+        ORDER BY po.problem_option_id
+      `, [problem.id]);
+      
+      problem.problem_options = options.rows;
+    }
     
     return result.rows;
   }

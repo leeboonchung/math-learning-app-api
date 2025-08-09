@@ -28,23 +28,19 @@ class LessonService {
    * @param {number|null} userId - User ID for progress tracking
    * @returns {Object} Lesson with problems and progress data
    */
-  static async getLessonById(lessonId, userId = null) {
+  static async getLessonById(lessonId) {
     try {
       let lesson;
       
-      if (userId) {
-        lesson = await Lesson.getWithProgress(lessonId, userId);
-      } else {
-        lesson = await Lesson.findById(lessonId, true);
-        if (lesson) {
-          // Add default progress data for non-authenticated users
-          lesson.is_completed = false;
-          lesson.best_score = 0;
-          lesson.attempts_count = 0;
-          lesson.last_attempted_at = null;
-          lesson.completed_at = null;
-        }
-      }
+    lesson = await Lesson.findById(lessonId, true);
+    if (lesson) {
+        // Add default progress data for non-authenticated users
+        lesson.is_completed = false;
+        lesson.best_score = 0;
+        lesson.attempts_count = 0;
+        lesson.last_attempted_at = null;
+        lesson.completed_at = null;
+    }
 
       if (!lesson) {
         const error = new Error('Lesson not found');
