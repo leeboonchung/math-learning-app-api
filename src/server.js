@@ -16,10 +16,16 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? [
+      'https://your-frontend-domain.com',
+      'https://your-app-name.vercel.app', // Add your Vercel domain here
+      process.env.FRONTEND_URL // Allow custom frontend URL from env
+    ].filter(Boolean) // Remove any undefined values
+  : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-frontend-domain.com'] 
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -59,12 +65,14 @@ app.get('/', (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Math Learning App API is running on port ${PORT}`);
-  console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
-});
+// Start server (only if not in Vercel environment)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Math Learning App API is running on port ${PORT}`);
+    console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
