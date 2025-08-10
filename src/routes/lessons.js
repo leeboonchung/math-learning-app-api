@@ -185,11 +185,15 @@ router.get('/:id', optionalAuth, LessonController.getLessonById);
  *           schema:
  *             $ref: '#/components/schemas/SubmitAnswers'
  *           example:
- *             attempt_id: "550e8400-e29b-41d4-a716-446655440000"
+ *             submission_id: "550e8400-e29b-41d4-a716-446655440000"
+ *             lesson_id: "550e8400-e29b-41d4-a716-446655440001"
  *             answers:
- *               "550e8400-e29b-41d4-a716-446655440101": "8"
- *               "550e8400-e29b-41d4-a716-446655440102": "19"
- *               "550e8400-e29b-41d4-a716-446655440103": "43"
+ *               - problem_id: "550e8400-e29b-41d4-a716-446655440101"
+ *                 selected_option_id: "550e8400-e29b-41d4-a716-446655440201"
+ *               - problem_id: "550e8400-e29b-41d4-a716-446655440102"
+ *                 selected_option_id: "550e8400-e29b-41d4-a716-446655440206"
+ *               - problem_id: "550e8400-e29b-41d4-a716-446655440103"
+ *                 selected_option_id: null
  *     responses:
  *       200:
  *         description: Submission processed successfully
@@ -205,7 +209,7 @@ router.get('/:id', optionalAuth, LessonController.getLessonById);
  *             example:
  *               success: true
  *               data:
- *                 attempt_id: "550e8400-e29b-41d4-a716-446655440000"
+ *                 submission_id: "550e8400-e29b-41d4-a716-446655440000"
  *                 score: 100
  *                 xp_earned: 10
  *                 is_completed: true
@@ -251,6 +255,6 @@ router.get('/:id', optionalAuth, LessonController.getLessonById);
  *               error: "Validation Error"
  *               message: "Lesson has no problems to grade"
  */
-router.post('/:id/submit', authenticateToken, LessonController.submitAnswers);
+router.post('/:id/submit', LessonController.submitAnswers);
 
 module.exports = router;

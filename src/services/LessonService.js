@@ -1,5 +1,6 @@
 const Lesson = require('../models/Lesson');
-const LessonAttempt = require('../models/LessonAttempt');
+const Submission = require('../models/Submission');
+const LessonProgress = require('../models/LessonProgress');
 const User = require('../models/User');
 const { v4: uuidv4 } = require('uuid');
 
@@ -65,32 +66,34 @@ class LessonService {
 
   /**
    * Submit answers for a lesson
-   * @param {number} lessonId - Lesson ID
-   * @param {number} userId - User ID
-   * @param {string} attemptId - Unique attempt identifier
-   * @param {Object} answers - Map of problem_id to answer
+   * @param {string} lessonId - Lesson ID
+   * @param {string} userId - User ID
+   * @param {string} submissionId - Unique submission identifier
+   * @param {Array} answers - Array of answers with problem_id and selected_option_id
    * @returns {Object} Submission result with score, XP, and progress
    */
-  static async submitAnswers(lessonId, userId, attemptId, answers) {
+  static async submitAnswers(submissionId, lessonId, userId, answers) {
     try {
-      // Validate attempt ID format
-      if (!this.isValidUUID(attemptId)) {
-        const error = new Error('Invalid attempt ID format');
-        error.code = 'INVALID_ATTEMPT_ID';
+      // Validate submission ID format
+      if (!this.isValidUUID(submissionId)) {
+        const error = new Error('Invalid submission ID format');
+        error.code = 'INVALID_SUBMISSION_ID';
         error.statusCode = 400;
         throw error;
       }
 
-      // Check if this attempt was already processed (idempotent)
-      const existingAttempt = await LessonAttempt.findByAttemptId(attemptId);
-      if (existingAttempt) {
-        // Return the existing attempt result
+      // Check if this submission was already processed (idempotent)
+      const existingSubmissions = await Submission.findBySubmissionId(submissionId);
+      if (existingSubmissions.length > 0) {
+        // Return the existing submission result
         const userStats = await User.getStats(userId);
+        const userProgress = await LessonProgress.getUserProgress(userId, lessonId);
+        
         return {
-          attempt_id: existingAttempt.attempt_id,
-          score: parseFloat(existingAttempt.score),
-          xp_earned: existingAttempt.xp_earned,
-          is_completed: existingAttempt.is_completed,
+          submission_id: submissionId,
+          score: userProgress ? userProgress.best_score : 0,
+          xp_earned: 0, // No additional XP for duplicate submission
+          is_completed: userProgress ? userProgress.is_completed : false,
           current_streak: userStats.current_streak,
           total_xp: userStats.total_xp,
           progress_percentage: userStats.progress_percentage,
@@ -115,33 +118,39 @@ class LessonService {
         error.statusCode = 422;
         throw error;
       }
+      // Create submissions in database
+      const submissionData = {
+        submissionId,
+        userId,
+        lessonId,
+        answers
+      };
+      await Submission.createSubmissions(submissionData);
 
       // Grade the answers
       const gradingResult = this.gradeAnswers(problems, answers);
-      
+      console.log("Grading Result:", gradingResult);
       // Calculate XP and completion status
       const score = gradingResult.score;
       const isCompleted = score >= 70; // 70% threshold for completion
-      const xpEarned = this.calculateXP(lesson.xp_reward, score, isCompleted);
-
-      // Create lesson attempt record
-      const attemptData = {
-        attemptId,
+      
+      // Update lesson progress
+      const progressData = {
         userId,
         lessonId,
-        submittedAnswers: gradingResult.gradedAnswers,
+        submissionId,
         score,
-        xpEarned,
-        isCompleted
+        expEarned: gradingResult.expEarned,
+        isCompleted,
+        gradingResults: gradingResult.gradedAnswers
       };
-
-      await LessonAttempt.create(attemptData);
+      await LessonProgress.updateProgress(progressData);
 
       // Get updated user stats
       const userStats = await User.getStats(userId);
 
       return {
-        attempt_id: attemptId,
+        submission_id: submissionId,
         score,
         xp_earned: xpEarned,
         is_completed: isCompleted,
@@ -166,18 +175,18 @@ class LessonService {
   }
 
   /**
-   * Get user's attempts for a lesson
-   * @param {number} userId - User ID
-   * @param {number|null} lessonId - Lesson ID (optional)
-   * @returns {Array} List of attempts
+   * Get user's progress and submissions for lessons
+   * @param {string} userId - User ID
+   * @param {string|null} lessonId - Lesson ID (optional)
+   * @returns {Array} List of lesson progress with submission details
    */
   static async getUserAttempts(userId, lessonId = null) {
     try {
-      const attempts = await LessonAttempt.getUserAttempts(userId, lessonId);
-      return attempts;
+      const progress = await LessonProgress.getUserProgress(userId, lessonId);
+      return progress;
     } catch (error) {
-      const serviceError = new Error('Failed to retrieve user attempts');
-      serviceError.code = 'ATTEMPTS_FETCH_FAILED';
+      const serviceError = new Error('Failed to retrieve user progress');
+      serviceError.code = 'PROGRESS_FETCH_FAILED';
       serviceError.statusCode = 500;
       serviceError.originalError = error;
       throw serviceError;
@@ -186,22 +195,42 @@ class LessonService {
 
   /**
    * Grade submitted answers against correct answers
-   * @param {Array} problems - Array of problem objects with correct answers
-   * @param {Object} answers - Map of problem_id to submitted answer
+   * @param {Array} problems - Array of problem objects with correct answers and options
+   * @param {Array} answers - Array of submitted answers with problem_id and selected_option_id
    * @returns {Object} Grading result
    */
   static gradeAnswers(problems, answers) {
     let correctAnswers = 0;
+    let expEarned = 0;
     const gradedAnswers = {};
 
-    for (const problem of problems) {
-      const userAnswer = answers[problem.id];
-      const isCorrect = userAnswer && 
-        userAnswer.trim().toLowerCase() === problem.correct_answer.trim().toLowerCase();
+    // Convert answers array to a map for easier lookup
+    const answersMap = {};
+    for (const answer of answers) {
+      answersMap[answer.problem_id] = answer.selected_option_id;
+    }
 
-      gradedAnswers[problem.id] = {
-        user_answer: userAnswer || '',
-        correct_answer: problem.correct_answer,
+    for (const problem of problems) {
+      const selectedOptionId = answersMap[problem.problem_id];
+      let isCorrect = false;
+      let selectedOption = null;
+
+      // Find the selected option from problem options
+      if (selectedOptionId && problem.problem_options) {
+        selectedOption = problem.problem_options.find(
+          option => option.problem_option_id.toString() === selectedOptionId.toString()
+        );
+        
+        // Check if the selected option matches the correct answer
+        if (selectedOption) {
+          isCorrect = selectedOption.is_right_answer
+          expEarned += problem.reward_xp;
+        }
+      }
+
+      gradedAnswers[problem.problem_id] = {
+        selected_option_id: selectedOptionId,
+        selected_option: selectedOption ? selectedOption.option : null,
         is_correct: isCorrect
       };
 
@@ -215,6 +244,7 @@ class LessonService {
     return {
       score,
       correctAnswers,
+      expEarned,
       gradedAnswers
     };
   }

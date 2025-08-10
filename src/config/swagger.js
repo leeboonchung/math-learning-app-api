@@ -220,34 +220,48 @@ const options = {
         },
         SubmitAnswers: {
           type: 'object',
-          required: ['attempt_id', 'answers'],
+          required: ['submission_id', 'lesson_id', 'answers'],
           properties: {
-            attempt_id: {
+            submission_id: {
               type: 'string',
               format: 'uuid',
-              description: 'Unique attempt identifier (UUID v4)'
+              description: 'Unique submission identifier (UUID v4)'
+            },
+            lesson_id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'Lesson identifier (UUID v4)'
             },
             answers: {
-              type: 'object',
-              additionalProperties: {
-                type: 'string'
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['problem_id', 'selected_option_id'],
+                properties: {
+                  problem_id: {
+                    type: 'string',
+                    format: 'uuid',
+                    description: 'Problem identifier (UUID v4)'
+                  },
+                  selected_option_id: {
+                    type: 'string',
+                    format: 'uuid',
+                    nullable: true,
+                    description: 'Selected option identifier (UUID v4) or null if no option selected'
+                  }
+                }
               },
-              description: 'Map of problem_id to answer',
-              example: {
-                "1": "8",
-                "2": "19",
-                "3": "43"
-              }
+              description: 'Array of problem answers with selected options'
             }
           }
         },
         SubmissionResult: {
           type: 'object',
           properties: {
-            attempt_id: {
+            submission_id: {
               type: 'string',
               format: 'uuid',
-              description: 'Attempt identifier'
+              description: 'Submission identifier'
             },
             score: {
               type: 'number',

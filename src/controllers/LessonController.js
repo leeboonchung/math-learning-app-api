@@ -47,18 +47,11 @@ class LessonController {
     }
   }
 
-  // POST /api/lessons/:id/submit - Submit answers with attempt_id
+  // POST /api/lessons/:id/submit - Submit answers with submission_id
   static async submitAnswers(req, res, next) {
     try {
-      const lessonId = req.params.id;
+      const submission_id = req.params.id;
       
-      if (!LessonController.validateGuid(lessonId)) {
-        return res.status(400).json({
-          error: 'Validation Error',
-          message: 'Invalid lesson ID format. Expected GUID/UUID format.'
-        });
-      }
-
       // Validate request body
       const { error, value } = submitAnswersSchema.validate(req.body);
       if (error) {
@@ -68,11 +61,9 @@ class LessonController {
           details: error.details
         });
       }
-
-      const { attempt_id, answers } = value;
-      const userId = req.user.id;
-
-      const result = await LessonService.submitAnswers(lessonId, userId, attempt_id, answers);
+      const { lesson_id, user_id, answers } = value;
+    
+      const result = await LessonService.submitAnswers(submission_id, lesson_id, user_id, answers);
 
       res.json({
         success: true,
@@ -83,7 +74,7 @@ class LessonController {
     }
   }
 
-  // GET /api/lessons/:id/attempts - Get user attempts for a lesson
+  // GET /api/lessons/:id/attempts - Get user progress and submissions for a lesson
   static async getLessonAttempts(req, res, next) {
     try {
       const lessonId = req.params.id;

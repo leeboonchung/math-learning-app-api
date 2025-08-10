@@ -1,10 +1,13 @@
 const Joi = require('joi');
 
 const submitAnswersSchema = Joi.object({
-  attempt_id: Joi.string().uuid().required(),
-  answers: Joi.object().pattern(
-    Joi.number().integer().positive(), // problem_id
-    Joi.string().required() // answer
+  lesson_id: Joi.string().uuid().required(),
+  user_id: Joi.string().uuid().required(),
+  answers: Joi.array().items(
+    Joi.object({
+      problem_id: Joi.string().uuid().required(),
+      selected_option_id: Joi.string().uuid().allow(null)
+    })
   ).required().min(1)
 });
 

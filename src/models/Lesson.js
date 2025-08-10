@@ -117,24 +117,27 @@ class Lesson {
 
   static async getProblemsWithAnswers(lessonId) {
     const result = await db.query(`
-      SELECT id, question, correct_answer, problem_type, options, order_index
-      FROM problems 
+      SELECT 
+      p.problem_id, 
+      p.question,
+      p.reward_xp
+      FROM public.problem p
       WHERE lesson_id = $1 
-      ORDER BY order_index
+      ORDER BY p.order
     `, [lessonId]);
-    
     // Get problem options for each problem
     for (let problem of result.rows) {
       const options = await db.query(`
         SELECT 
           po.problem_option_id,
           po.problem_id,
-          po.option
-        FROM problem_options po
+          po.option,
+          po.is_right_answer
+        FROM public.problem_option po
         WHERE po.problem_id = $1
         ORDER BY po.problem_option_id
-      `, [problem.id]);
-      
+      `, [problem.problem_id]);
+      console.log("140", options.rows);
       problem.problem_options = options.rows;
     }
     

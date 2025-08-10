@@ -1,5 +1,6 @@
 const User = require('../models/User');
-const LessonAttempt = require('../models/LessonAttempt');
+const Submission = require('../models/Submission');
+const LessonProgress = require('../models/LessonProgress');
 
 class UserService {
   /**
@@ -142,11 +143,11 @@ class UserService {
         throw error;
       }
 
-      // Get user attempts for analytics
-      const attempts = await LessonAttempt.getUserAttempts(userId);
+      // Get user progress for analytics
+      const progressRecords = await LessonProgress.getAllUserProgress(userId);
       
       // Calculate analytics
-      const analytics = this.calculateLearningAnalytics(attempts, user);
+      const analytics = this.calculateLearningAnalytics(progressRecords, user);
       
       return analytics;
     } catch (error) {
@@ -163,50 +164,46 @@ class UserService {
   }
 
   /**
-   * Calculate learning analytics from user attempts
-   * @param {Array} attempts - User's lesson attempts
+   * Calculate learning analytics from user progress records
+   * @param {Array} progressRecords - User's lesson progress records
    * @param {Object} user - User object
    * @returns {Object} Learning analytics
    */
-  static calculateLearningAnalytics(attempts, user) {
-    const totalAttempts = attempts.length;
-    const completedAttempts = attempts.filter(attempt => attempt.is_completed).length;
+  static calculateLearningAnalytics(progressRecords, user) {
+    const totalLessonsAttempted = progressRecords.length;
+    const completedLessons = progressRecords.filter(progress => progress.is_completed).length;
     
-    const averageScore = totalAttempts > 0 
-      ? attempts.reduce((sum, attempt) => sum + parseFloat(attempt.score), 0) / totalAttempts 
+    const averageScore = totalLessonsAttempted > 0 
+      ? progressRecords.reduce((sum, progress) => sum + parseFloat(progress.best_score || 0), 0) / totalLessonsAttempted 
       : 0;
 
-    const totalXPEarned = attempts.reduce((sum, attempt) => sum + attempt.xp_earned, 0);
-
-    // Group attempts by lesson to find unique lessons attempted
-    const lessonsAttempted = new Set(attempts.map(attempt => attempt.lesson_id));
-    const uniqueLessonsAttempted = lessonsAttempted.size;
-
-    // Calculate completion rate
-    const completionRate = totalAttempts > 0 ? (completedAttempts / totalAttempts) * 100 : 0;
+    // Calculate total attempts across all lessons
+    const totalAttempts = progressRecords.reduce((sum, progress) => sum + (progress.attempts_count || 0), 0);
 
     // Find recent activity (last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const recentAttempts = attempts.filter(attempt => 
-      new Date(attempt.submitted_at) >= sevenDaysAgo
+    const recentProgress = progressRecords.filter(progress => 
+      new Date(progress.last_attempted_at) >= sevenDaysAgo
     );
 
+    // Calculate recent XP (this would need to be tracked separately or calculated from submissions)
+    const recentXP = recentProgress.length * 10; // Approximate based on recent activity
+
     return {
-      user_id: user.id,
-      total_attempts: totalAttempts,
-      completed_attempts: completedAttempts,
-      completion_rate: Math.round(completionRate * 100) / 100,
+      user_id: user.user_id,
+      total_lessons_attempted: totalLessonsAttempted,
+      completed_lessons: completedLessons,
+      completion_rate: totalLessonsAttempted > 0 ? Math.round((completedLessons / totalLessonsAttempted) * 100 * 100) / 100 : 0,
       average_score: Math.round(averageScore * 100) / 100,
-      total_xp_earned: totalXPEarned,
+      total_attempts: totalAttempts,
       current_total_xp: user.total_xp,
-      unique_lessons_attempted: uniqueLessonsAttempted,
       current_streak: user.current_streak,
       best_streak: user.best_streak,
       recent_activity: {
-        attempts_last_7_days: recentAttempts.length,
-        xp_earned_last_7_days: recentAttempts.reduce((sum, attempt) => sum + attempt.xp_earned, 0)
+        lessons_attempted_last_7_days: recentProgress.length,
+        estimated_xp_earned_last_7_days: recentXP
       },
       account_created: user.created_at,
       last_updated: user.updated_at
