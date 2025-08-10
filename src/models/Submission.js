@@ -34,12 +34,6 @@ class Submission {
           VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
           RETURNING *
         `, [submissionId, userId, lessonId, JSON.stringify(answers)]);
-      // // Create individual submissions for each answer
-      // for (const answer of answers) {
-        
-
-      //   createdSubmissions.push(result.rows[0]);
-      // }
 
       await client.query('COMMIT');
       return result.rows;

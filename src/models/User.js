@@ -67,21 +67,19 @@ class User {
   static async getStats(userId) {
     const result = await db.query(`
       SELECT 
-        total_xp,
+        total_exp_earned,
         current_streak,
-        best_streak,
-        (SELECT COUNT(*) FROM user_lesson_progress WHERE user_id = $1 AND is_completed = true) as completed_lessons,
-        (SELECT COUNT(*) FROM lessons WHERE is_active = true) as total_lessons
-      FROM users 
-      WHERE id = $1
+        best_streak
+      FROM public.user 
+      WHERE user_id = $1
     `, [userId]);
     
     if (result.rows.length === 0) return null;
     
     const stats = result.rows[0];
-    stats.progress_percentage = stats.total_lessons > 0 
-      ? Math.round((stats.completed_lessons / stats.total_lessons) * 100) 
-      : 0;
+    // stats.progress_percentage = stats.total_lessons > 0 
+    //   ? Math.round((stats.completed_lessons / stats.total_lessons) * 100) 
+    //   : 0;
     
     return stats;
   }

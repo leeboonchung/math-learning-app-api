@@ -15,42 +15,47 @@ class LessonProgress {
    * @returns {Object} Updated progress record
    */
   static async updateProgress(progressData) {
-    const { userId, lessonId, submissionId, score, xpEarned, isCompleted, gradingResults } = progressData;
+    const { userId, lessonId, submissionId, score, xpEarned, gradingResults } = progressData;
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
 
-      // Update or create user lesson progress
-      const progressResult = await client.query(`
-        INSERT INTO user_lesson_progress (user_id, lesson_id, is_completed, best_score, attempts_count, last_attempted_at, completed_at)
-        VALUES ($1, $2, $3, $4, 1, CURRENT_TIMESTAMP, $5)
-        ON CONFLICT (user_id, lesson_id) 
-        DO UPDATE SET
-          is_completed = GREATEST(user_lesson_progress.is_completed::int, $3::int)::boolean,
-          best_score = GREATEST(user_lesson_progress.best_score, $4),
-          attempts_count = user_lesson_progress.attempts_count + 1,
-          last_attempted_at = CURRENT_TIMESTAMP,
-          completed_at = CASE WHEN $3 = true AND user_lesson_progress.is_completed = false THEN CURRENT_TIMESTAMP ELSE user_lesson_progress.completed_at END
-        RETURNING *
-      `, [userId, lessonId, isCompleted, score, isCompleted ? new Date() : null]);
+      // Check if progress record already exists
+      const existingProgress = await client.query(`
+        SELECT * FROM user_progress 
+        WHERE user_id = $1 AND lesson_id = $2
+      `, [userId, lessonId]);
+
+      let progressResult;
+      
+      if (existingProgress.rows.length > 0) {
+        // Update existing progress
+        progressResult = await client.query(`
+          UPDATE user_progress 
+          SET 
+            score = GREATEST(score, $3),
+            lesson_exp_earned = lesson_exp_earned + $4,
+            completion_date = $5,
+            progress = 'Completed'
+          WHERE user_id = $1 AND lesson_id = $2
+          RETURNING *
+        `, [userId, lessonId, score, xpEarned, new Date()]);
+      } else {
+        // Create new progress record
+        progressResult = await client.query(`
+          INSERT INTO user_progress 
+          (user_id, lesson_id, score, lesson_exp_earned, completion_date, current_problem_id, progress)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING *
+        `, [userId, lessonId, score, xpEarned, new Date(), null, 'In Progress']);
+      }
 
       // Update user XP
       await client.query(
-        'UPDATE "user" SET total_xp = total_xp + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        'UPDATE public.user SET total_exp_earned = total_exp_earned + $1, last_activity_date = CURRENT_TIMESTAMP WHERE user_id = $2',
         [xpEarned, userId]
       );
-
-      // Update streak if lesson is completed
-      if (isCompleted) {
-        await client.query(`
-          UPDATE "user" SET 
-            current_streak = current_streak + 1,
-            best_streak = GREATEST(best_streak, current_streak + 1),
-            updated_at = CURRENT_TIMESTAMP
-          WHERE user_id = $1
-        `, [userId]);
-      }
 
       await client.query('COMMIT');
       return progressResult.rows[0];
@@ -72,7 +77,7 @@ class LessonProgress {
     if (lessonId) {
       // Get progress for specific lesson
       const result = await db.query(`
-        SELECT * FROM user_lesson_progress 
+        SELECT * FROM user_progress 
         WHERE user_id = $1 AND lesson_id = $2
       `, [userId, lessonId]);
       
@@ -90,11 +95,11 @@ class LessonProgress {
    */
   static async getAllUserProgress(userId) {
     const result = await db.query(`
-      SELECT ulp.*, l.lesson_name, l.lesson_category
-      FROM user_lesson_progress ulp
-      LEFT JOIN lesson l ON ulp.lesson_id = l.lesson_id
-      WHERE ulp.user_id = $1
-      ORDER BY ulp.last_attempted_at DESC
+      SELECT up.*, l.lesson_name, l.lesson_category
+      FROM user_progress up
+      LEFT JOIN lesson l ON up.lesson_id = l.lesson_id
+      WHERE up.user_id = $1
+      ORDER BY up.completion_date DESC
     `, [userId]);
     
     return result.rows;
@@ -109,11 +114,11 @@ class LessonProgress {
     const result = await db.query(`
       SELECT 
         COUNT(DISTINCT user_id) as total_attempts,
-        COUNT(DISTINCT CASE WHEN is_completed = true THEN user_id END) as completions,
-        AVG(best_score) as average_score,
-        MAX(best_score) as highest_score,
-        MIN(best_score) as lowest_score
-      FROM user_lesson_progress 
+        COUNT(DISTINCT CASE WHEN progress = 'Completed' THEN user_id END) as completions,
+        COALESCE(AVG(score), 0) as average_score,
+        COALESCE(MAX(score), 0) as highest_score,
+        COALESCE(MIN(score), 0) as lowest_score
+      FROM user_progress 
       WHERE lesson_id = $1
     `, [lessonId]);
     

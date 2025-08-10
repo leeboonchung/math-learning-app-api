@@ -131,9 +131,7 @@ class LessonService {
       const gradingResult = this.gradeAnswers(problems, answers);
       console.log("Grading Result:", gradingResult);
       // Calculate XP and completion status
-      const score = gradingResult.score;
-      const isCompleted = score >= 70; // 70% threshold for completion
-      
+      const score = gradingResult.score;      
       // Update lesson progress
       const progressData = {
         userId,
@@ -141,7 +139,6 @@ class LessonService {
         submissionId,
         score,
         expEarned: gradingResult.expEarned,
-        isCompleted,
         gradingResults: gradingResult.gradedAnswers
       };
       await LessonProgress.updateProgress(progressData);
@@ -152,14 +149,11 @@ class LessonService {
       return {
         submission_id: submissionId,
         score,
-        xp_earned: xpEarned,
-        is_completed: isCompleted,
+        xp_earned: gradingResult.expEarned,
         correct_answers: gradingResult.correctAnswers,
         total_problems: problems.length,
         current_streak: userStats.current_streak,
-        total_xp: userStats.total_xp,
-        progress_percentage: userStats.progress_percentage,
-        is_duplicate: false
+        total_xp: userStats.total_exp_earned
       };
     } catch (error) {
       if (error.statusCode) {
