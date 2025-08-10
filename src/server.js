@@ -16,13 +16,8 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet());
 
 // CORS configuration
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [
-      'https://your-frontend-domain.com',
-      'https://math-learning-app-api.vercel.app/', // Add your Vercel domain here
-      process.env.FRONTEND_URL // Allow custom frontend URL from env
-    ].filter(Boolean) // Remove any undefined values
-  : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'https://math-learning-app-ui.vercel.app/',
+      'https://math-learning-app-api.vercel.app/'];
 
 app.use(cors({
   origin: allowedOrigins,
